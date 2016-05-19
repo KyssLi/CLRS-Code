@@ -3,6 +3,7 @@
 #include <chrono>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <tuple>
 #include <utility>
@@ -331,18 +332,135 @@ std::vector<T> getLMIExt(const std::vector<T> &input)
 	return res;
 }
 
+///Optimal binary search tree
+template<typename T>
+class Matrix
+{
+public:
+	Matrix() = default;
+	Matrix(const size_t &m, const size_t &n)
+		:row(m), col(n), matrix(std::make_unique<std::unique_ptr<T[]>[]>(m))
+	{
+		for (size_t i = 0; i != m; ++i)
+			matrix[i] = std::make_unique<T[]>(n);
+	}
+	Matrix(const size_t &m, const size_t &n, const T &val)
+		:Matrix(m, n)
+	{
+		for (size_t i = 0; i != m; ++i)
+			for (size_t j = 0; j != n; ++j)
+				matrix[i][j] = val;
+	}
+	Matrix(Matrix &rhs)
+		:row(rhs.row), col(rhs.col)
+	{
+		rhs.row = rhs.col = 0;
+		matrix.reset(rhs.matrix.release());
+	}
+	Matrix& operator=(Matrix &rhs)
+	{
+		if (rhs != *this)
+		{
+			row = rhs.row;
+			col = rhs.col;
+			rhs.row = rhs.col = 0;
+			matrix.reset(rhs.matrix.release());
+		}
+		return *this;
+	}
+	~Matrix() = default;
+	std::unique_ptr<T[]>& operator[](const size_t &m) const { return matrix[m]; }
+	size_t Row() const { return row; }
+	size_t Col() const { return col; }
+private:
+	size_t row;
+	size_t col;
+	std::unique_ptr<std::unique_ptr<T[]>[]> matrix;
+};
+
+template<typename T = double>
+std::pair<Matrix<T>, Matrix<size_t>> optimalBST(const std::vector<T> &p,
+	const std::vector<T> &q,
+	const size_t &n)
+{
+	Matrix<T> e(n + 2, n + 2), w(n + 2, n + 2);
+	Matrix<size_t> root(n, n);
+	for (size_t i = 1; i != n + 2; ++i)
+	{
+		e[i][i - 1] = q[i - 1];
+		w[i][i - 1] = q[i - 1];
+	}
+	for (size_t l = 1; l <= n; ++l)
+		for (size_t i = 1; i <= n - l + 1; ++i)
+		{
+			size_t j = i + l - 1;
+			e[i][j] = std::numeric_limits<T>::max();
+			w[i][j] = w[i][j - 1] + p[j] + q[j];
+			for (size_t r = i; r <= j; ++r)
+			{
+				T t = e[i][r - 1] + e[r + 1][j] + w[i][j];
+				if (t < e[i][j])
+				{
+					e[i][j] = t;
+					root[i - 1][j - 1] = r;
+				}
+			}
+		}
+	return{ e, root };
+}
+void constructOptimalBSTAux(const Matrix<size_t> &root, const size_t &i, const size_t &j, const size_t &root_key)
+{
+	if (j < i - 1)
+		return;
+	else if (j == i - 1)
+	{
+		std::cout << "d" << j << "为k" << root_key << "的";
+		if (j < root_key)
+			std::cout << "左孩子" << std::endl;
+		else
+			std::cout << "右孩子" << std::endl;
+		return;
+	}
+	else
+	{
+		std::cout << "k" << root[i - 1][j - 1] << "为k" << root_key << "的";
+		if (root[i - 1][j - 1] < root_key)
+			std::cout << "左孩子" << std::endl;
+		else
+			std::cout << "右孩子" << std::endl;
+	}
+	constructOptimalBSTAux(root, i, root[i - 1][j - 1] - 1, root[i - 1][j - 1]);
+	constructOptimalBSTAux(root, root[i - 1][j - 1] + 1, j, root[i - 1][j - 1]);
+}
+void constructOptimalBST(const Matrix<size_t> &root)
+{
+	if (root.Row() == 0)
+		return;
+	std::cout << "Construct the Optimal binary search tree: " << std::endl;
+	std::cout << "k" << root[0][root.Row() - 1] << "为根" << std::endl;
+	constructOptimalBSTAux(root, 1, root[0][root.Row() - 1] - 1, root[0][root.Row() - 1]);
+	constructOptimalBSTAux(root, root[0][root.Row() - 1] + 1, root.Row(), root[0][root.Row() - 1]);
+}
+
 int main()
 {
 	auto start_time = std::chrono::steady_clock::now();
 
-	std::vector<int> seq{ 0,1,2,3,4,1,2,3,4,5 };
-	auto res5 = getLMIExt(seq);
-	std::cout << "Seq: ";
-	std::copy(seq.cbegin(), seq.cend(), std::ostream_iterator<int>{std::cout, " "});
-	std::cout << std::endl;
-	std::cout << "LMI: ";
-	std::copy(res5.cbegin(), res5.cend(), std::ostream_iterator<int>{std::cout, " "});
-	std::cout << std::endl;
+	std::vector<double> p{ 0, 0.04, 0.06, 0.08, 0.02, 0.10, 0.12, 0.14 };
+	std::vector<double> q{ 0.06, 0.06, 0.06, 0.06, 0.05, 0.05, 0.05, 0.05 };
+	auto res6 = optimalBST(p, q, 7);
+	std::cout << "Optimal E[search]: " << res6.first[1][7] << std::endl;
+	constructOptimalBST(res6.second);
+
+
+	//std::vector<int> seq{ 0,1,2,3,4,1,2,3,4,5 };
+	//auto res5 = getLMIExt(seq);
+	//std::cout << "Seq: ";
+	//std::copy(seq.cbegin(), seq.cend(), std::ostream_iterator<int>{std::cout, " "});
+	//std::cout << std::endl;
+	//std::cout << "LMI: ";
+	//std::copy(res5.cbegin(), res5.cend(), std::ostream_iterator<int>{std::cout, " "});
+	//std::cout << std::endl;
 
 
 	//std::vector<char> seq1{ 'A', 'B', 'C', 'B', 'D', 'A', 'B' };
