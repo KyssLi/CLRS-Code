@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstdlib>
 #include <algorithm>
 #include <chrono>
@@ -9,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <queue>
+#include <stack>
 #include <string>
 #include <utility>
 #include <vector>
@@ -18,8 +20,8 @@ template<typename T, typename W>
 struct Vertex
 {
 	Vertex() = default;
-	Vertex(const T &k)
-		:key(k)
+	Vertex(const T &j)
+		:key(j)
 	{}
 	~Vertex() = default;
 	T key;
@@ -176,22 +178,240 @@ W LSPofDAG(const Graph<T, W> &g, const T &s, const T &t)
 	}
 	return dist[t_pos];
 }
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+template<typename T>
+class Matrix
+{
+public:
+	Matrix() = default;
+	Matrix(const size_t &m, const size_t &n)
+		:row(m), col(n), matrix(std::make_unique<std::unique_ptr<T[]>[]>(m))
+	{
+		for (size_t i = 0; i != m; ++i)
+			matrix[i] = std::make_unique<T[]>(n);
+	}
+	Matrix(const size_t &m, const size_t &n, const T &val)
+		:Matrix(m, n)
+	{
+		for (size_t i = 0; i != m; ++i)
+			for (size_t j = 0; j != n; ++j)
+				matrix[i][j] = val;
+	}
+	Matrix(const size_t &m)
+		:Matrix(m, m)
+	{
+	}
+	Matrix(Matrix &rhs)
+		:row(rhs.row), col(rhs.col)
+	{
+		rhs.row = rhs.col = 0;
+		matrix.reset(rhs.matrix.release());
+	}
+	Matrix& operator=(Matrix &rhs)
+	{
+		if (rhs != *this)
+		{
+			row = rhs.row;
+			col = rhs.col;
+			rhs.row = rhs.col = 0;
+			matrix.reset(rhs.matrix.release());
+		}
+		return *this;
+	}
+	~Matrix() = default;
+	std::unique_ptr<T[]>& operator[](const size_t &m) const
+	{
+		return matrix[m];
+	}
+	size_t Row() const
+	{
+		return row;
+	}
+	size_t Col() const
+	{
+		return col;
+	}
+	void printMatrix() const
+	{
+		for (size_t i = 0; i != row; ++i)
+		{
+			for (size_t j = 0; j != col; ++j)
+				std::cout << matrix[i][j] << " ";
+			std::cout << std::endl;
+		}
+	}
+	template<typename Pred>
+	void printMatrix(Pred &func) const
+	{
+		for (size_t i = 0; i != row; ++i)
+		{
+			for (size_t j = 0; j != col; ++j)
+				func(matrix[i][j]);
+			std::cout << std::endl;
+		}
+	}
+private:
+	size_t row;
+	size_t col;
+	std::unique_ptr<std::unique_ptr<T[]>[]> matrix;
+};
+
+///15-2:The longest palindrome subsequence
+std::string getLPS(const std::string &input)
+{
+	std::string tmp_str;
+	std::copy(input.crbegin(), input.crend(), std::back_inserter(tmp_str));
+	size_t m = input.size() + 1;
+	Matrix<char> c(m, m, 0);
+	for (size_t i = 1; i != m; ++i)
+		for (size_t j = 1; j != m; ++j)
+		{
+			if (input[i - 1] == tmp_str[j - 1])
+				c[i][j] = c[i - 1][j - 1] + 1;
+			else if (c[i - 1][j] >= c[i][j - 1])
+				c[i][j] = c[i - 1][j];
+			else
+				c[i][j] = c[i][j - 1];
+		}
+	size_t i = input.size(), j = tmp_str.size();
+	std::string res;
+	while (i != 0 && j != 0)///reconstruct the LPS use table "c", need O(m+n) time
+	{
+		if (input[i - 1] == tmp_str[j - 1])
+		{
+			res.push_back(input[--i]);
+			--j;
+		}
+		else if (c[i - 1][j] >= c[i][j - 1])
+			--i;
+		else
+			--j;
+	}
+	return res;
+}
+
+///15-3:bitonic euclidean traveling-salesman problem
+template<typename T>
+struct point2D
+{
+	point2D() = default;
+	point2D(const T &x_, const T &y_) :x(x_), y(y_) {}
+	T x;
+	T y;
+};
+template<typename T>
+double distPoint2D(const point2D<T> &one, const point2D<T> &two)
+{
+	T a = (two.y - one.y) * (two.y - one.y);
+	T b = (two.x - one.x) * (two.x - one.x);
+	return sqrt(static_cast<double>(a + b));
+}
+template<typename T>
+std::pair<double, std::vector<T>> bitonicEuclideanTSP(std::vector<point2D<T>> &input)
+{
+	size_t size = input.size();
+	std::sort(input.begin(), input.end(), [](const auto &l, const auto &r)->bool {return l.x < r.x; });
+	///d[i][j] is the distance of input[i] and input[j]
+	Matrix<double> d(size, size);
+	for (size_t i = 0; i != size; ++i)
+		for (size_t j = 0; j != size; ++j)
+			if (i == j)
+				d[i][j] = 0;
+			else if (j > i)
+				d[i][j] = distPoint2D(input[i], input[j]);
+			else
+				d[i][j] = d[j][i];
+	///path[i][j] is the predecessor "point" of point "j"
+	Matrix<T> path(size, size, -1);///assume that all the point is (x >= 0, y >= 0)
+	path[0][0] = 0;
+	path[0][1] = 0;
+	///b[i][j] is the shortest path include ("i" to "0") and ("0" to "j"), assume that ("j" > "i"), at the last ("j" == "i")
+	Matrix<double> b(size, size);
+	b[0][0] = 0.0;
+	b[0][1] = d[0][1];
+	for (size_t j = 2; j != size; ++j)
+		for (size_t i = 0; i != j; ++i)
+		{
+			if (j > i + 1)
+			{
+				b[i][j] = b[i][j - 1] + d[j - 1][j];
+				path[i][j] = j - 1;
+			}
+			else
+			{
+				b[i][j] = std::numeric_limits<double>::max();
+				for (size_t k = 0; k != i; ++k)
+				{
+					double tmp = b[k][i] + d[k][j];
+					if (tmp < b[i][j])
+					{
+						b[i][j] = tmp;
+						path[i][j] = k;
+					}
+				}
+			}
+		}
+	b[size - 1][size - 1] = b[size - 2][size - 1] + d[size - 2][size - 1];
+	//b.printMatrix();
+	//path.printMatrix([](const auto &v)->void {std::cout << v<< " "; });
+	std::vector<T> tmp_vec;
+	std::stack<T> S[2];///S[0] store one path and S[1] store another path
+	size_t i = size - 2, j = size - 1, k = 0;
+	while (j > 0)
+	{
+		S[k].push(j);
+		if ((j = path[i][j]) < i)
+		{
+			std::swap(i, j);
+			k = 1 - k;
+		}
+	}
+	S[0].push(0);
+	while (!S[1].empty())
+	{
+		S[0].push(S[1].top());
+		S[1].pop();
+	}
+	for (size_t m = 0; m != size; ++m)
+	{
+		tmp_vec.push_back(S[0].top());
+		S[0].pop();
+	}
+	return{ b[size - 1][size - 1],  tmp_vec };
+}
+
 
 int main()
 {
 	auto start_time = std::chrono::steady_clock::now();
 
-	Graph<int, int> graph{ 1,2,3,4,5,6 };
-	graph.addEdge(1, { 2,3 }, { 1,1 });
-	graph.addEdge(2, { 4,5 }, { 1,5 });
-	graph.addEdge(3, {});
-	graph.addEdge(4, { 3,5,6 }, { 1,1,1 });
-	graph.addEdge(5, { 6 }, { 1 });
-	graph.addEdge(6, {});
-	graph.printGraph();
-	int a = 1;
-	int b = 6;
-	std::cout << "The longest path from " << a << " to " << b << " is " << LSPofDAG(graph, a, b) << "." << std::endl;
+	///15-3
+	std::vector<point2D<int>> input{ {0,6}, {2,3},{5,4},{7,5},{8,2},{1,0},{6,1} };
+	auto res = bitonicEuclideanTSP(input);
+	std::cout << "The shortest path: " << res.first << std::endl;
+	std::cout << "The path may be: ";
+	for (const auto &v : res.second)
+		std::cout << v << " ";
+	std::cout << std::endl;
+
+	///15-2
+	//const std::string str = "10234321";
+	//std::cout << "LPS of " << str << " is: ";
+	//std::cout << getLPS(str) << std::endl;
+
+	///15-1
+	//Graph<int, int> graph{ 1,2,3,4,5,6 };
+	//graph.addEdge(1, { 2,3 }, { 1,1 });
+	//graph.addEdge(2, { 4,5 }, { 1,5 });
+	//graph.addEdge(3, {});
+	//graph.addEdge(4, { 3,5,6 }, { 1,1,1 });
+	//graph.addEdge(5, { 6 }, { 1 });
+	//graph.addEdge(6, {});
+	//graph.printGraph();
+	//int a = 1;
+	//int b = 6;
+	//std::cout << "The longest path from " << a << " to " << b << " is " << LSPofDAG(graph, a, b) << "." << std::endl;
 
 	std::cout << "\nThe program run "
 		<< std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time).count()
