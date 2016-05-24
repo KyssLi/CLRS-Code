@@ -20,8 +20,8 @@ template<typename T, typename W>
 struct Vertex
 {
 	Vertex() = default;
-	Vertex(const T &j)
-		:key(j)
+	Vertex(const T &k)
+		:key(k)
 	{}
 	~Vertex() = default;
 	T key;
@@ -381,19 +381,84 @@ std::pair<double, std::vector<T>> bitonicEuclideanTSP(std::vector<point2D<T>> &i
 	return{ b[size - 1][size - 1],  tmp_vec };
 }
 
+///15-4pretty printing problem
+template<typename T>
+T cubeCal(const T &val)
+{
+	return val * val * val;
+}
+int NeatlyPrinting(const std::vector<std::string> &input, const int &M)///M is the maximum char in each line
+{
+	if (input.empty())
+		return 0;
+	const int MAX_SIZE = 1000;///each word's size is less than 1000
+	int cap = static_cast<int>(input.size());
+	Matrix<int> s(cap, cap, 0);///s[i][j] is the number of trailing spaces when the words("i" to "j") in the same line
+	Matrix<int> c(cap, cap, 0);///c[i][j] is the cube of the s[i][j] in some situation
+	std::unique_ptr<int[]> C = std::make_unique<int[]>(cap + 1);///C[j] is the optimal cost to print words("1" to "j")
+	std::unique_ptr<int[]> p = std::make_unique<int[]>(cap);///p[j] is the first word's position in line that contains word "j";
+	for (int i = 0; i != cap; ++i)
+	{
+		s[i][i] = M - input[i].size();
+		for (int j = i + 1; j != cap; ++j)
+			s[i][j] = s[i][j - 1] - input[j].size() - 1;
+	}
+	for (int i = 0; i != cap; ++i)
+		for (int j = i; j != cap; ++j)
+			if (s[i][j] < 0)
+				c[i][j] = MAX_SIZE;
+			else if (j == cap - 1 && s[i][j] >= 0)
+				c[i][j] = 0;
+			else
+				c[i][j] = cubeCal(s[i][j]);
+	C[0] = 0;
+	for (int j = 1; j <= cap; ++j)
+	{
+		C[j] = std::numeric_limits<int>::max();
+		for (int i = 1; i <= j; ++i)
+			if (C[i - 1] + c[i - 1][j - 1] < C[j])
+			{
+				C[j] = C[i - 1] + c[i - 1][j - 1];
+				p[j - 1] = i - 1;
+			}
+	}
+	int start_pos = 0, end_pos = cap - 1;
+	std::stack<std::pair<int, int>> aux_stack_pair;
+	while (end_pos >= 0)
+	{
+		start_pos = p[end_pos];
+		aux_stack_pair.push(std::make_pair(start_pos, end_pos));
+		end_pos = --start_pos;
+	}
+	std::cout << "Neatly Printing: " << std::endl;
+	while (!aux_stack_pair.empty())
+	{
+		auto v = aux_stack_pair.top();
+		aux_stack_pair.pop();
+		for (auto i = v.first; i <= v.second; ++i)
+			std::cout << input[i] << " ";
+		std::cout << std::endl;
+	}
+	return C[cap];
+}
 
 int main()
 {
 	auto start_time = std::chrono::steady_clock::now();
 
+	///15-4
+	std::vector<std::string> input{ "a", "abc", "a", "abcd", "a" };
+	auto res = NeatlyPrinting(input, 7);
+	std::cout << "The sum of trailing space is: " << res << std::endl;
+
 	///15-3
-	std::vector<point2D<int>> input{ {0,6}, {2,3},{5,4},{7,5},{8,2},{1,0},{6,1} };
-	auto res = bitonicEuclideanTSP(input);
-	std::cout << "The shortest path: " << res.first << std::endl;
-	std::cout << "The path may be: ";
-	for (const auto &v : res.second)
-		std::cout << v << " ";
-	std::cout << std::endl;
+	//std::vector<point2D<int>> input{ {0,6}, {2,3},{5,4},{7,5},{8,2},{1,0},{6,1} };
+	//auto res = bitonicEuclideanTSP(input);
+	//std::cout << "The shortest path: " << res.first << std::endl;
+	//std::cout << "The path may be: ";
+	//for (const auto &v : res.second)
+	//	std::cout << v << " ";
+	//std::cout << std::endl;
 
 	///15-2
 	//const std::string str = "10234321";
