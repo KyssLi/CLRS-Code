@@ -39,6 +39,8 @@ public:
 	{
 		auto p = root;
 		eraseAux(p, k);
+		if (root->n == 0)
+			root = root->child[0];
 	}
 	std::pair<std::shared_ptr<BTNode>, int> find(const T &k) const
 	{
@@ -386,7 +388,6 @@ int main()
 	BTree<char> tree;
 	for (const auto &c : str)
 		tree.insert(c);
-	tree.erase('M');
 	tree.printBTree();
 
 	auto val = 'Y';
@@ -409,6 +410,12 @@ int main()
 	auto val2 = 'Y';
 	std::cout << "The pre-key of " << val2 << " is " << tree.predecessorKey(val2) << std::endl;
 	std::cout << "The next-key of " << val2 << " is " << tree.successorKey(val2) << std::endl;
+
+	for (const auto &c : str)
+	{
+		tree.erase(c);
+		tree.printBTree();
+	}
 
 	std::cout << "\nThe program run "
 		<< std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time).count()
